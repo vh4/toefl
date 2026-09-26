@@ -1,4 +1,5 @@
 import prisma from '@/lib/db/prisma';
+import { FALLBACK_SECTIONS } from '@/lib/data/fallback-content';
 
 export const DEFAULT_USER_ID = 'user_demo_toefl';
 
@@ -25,24 +26,29 @@ export interface RoadmapSectionItem {
 }
 
 export async function getRoadmap(userId: string = DEFAULT_USER_ID): Promise<RoadmapSectionItem[]> {
-  const sections = await prisma.section.findMany({
-    orderBy: { order: 'asc' },
-    include: {
-      topics: {
-        orderBy: { order: 'asc' },
-        include: {
-          lessons: {
-            orderBy: { order: 'asc' },
-            include: {
-              progress: {
-                where: { userId },
+  try {
+    const sections = await prisma.section.findMany({
+      orderBy: { order: 'asc' },
+      include: {
+        topics: {
+          orderBy: { order: 'asc' },
+          include: {
+            lessons: {
+              orderBy: { order: 'asc' },
+              include: {
+                progress: {
+                  where: { userId },
+                },
               },
             },
           },
         },
       },
-    },
-  });
+    });
+
+    if (!sections || sections.length === 0) {
+      return FALLBACK_SECTIONS;
+    }
 
   return sections.map((sec, secIdx) => {
     let totalLessonsInSection = 0;
@@ -112,4 +118,8 @@ export async function getRoadmap(userId: string = DEFAULT_USER_ID): Promise<Road
       topics,
     };
   });
+  } catch (error) {
+    console.warn('Database offline or unreachable, using fallback roadmap data:', error);
+    return FALLBACK_SECTIONS;
+  }
 }
