@@ -1,0 +1,145 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String     @id @default(cuid())
+  email     String?    @unique
+  name      String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  attempts  Attempt[]
+  mistakes  Mistake[]
+  progress  Progress[]
+}
+
+model Section {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  order       Int      @default(0)
+
+  topics      Topic[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Topic {
+  id          String   @id @default(cuid())
+  sectionId   String
+  name        String
+  slug        String
+  description String?
+  order       Int      @default(0)
+
+  section     Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sectionId, slug])
+}
+
+model Lesson {
+  id          String   @id @default(cuid())
+  topicId     String
+  title       String
+  slug        String   @unique
+  level       String   // e.g. "Beginner", "Intermediate", "Advanced"
+  explanation String   @db.Text
+  formula     String?  @db.Text
+  order       Int      @default(0)
+
+  topic       Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  questions   Question[]
+  progress    Progress[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Question {
+  id             String   @id @default(cuid())
+  lessonId       String
+  question       String   @db.Text
+  explanation    String   @db.Text
+  correctAnswer  String   // e.g. "B" or the answer text
+  order          Int      @default(0)
+
+  lesson         Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  options        QuestionOption[]
+  attempts       Attempt[]
+  mistakes       Mistake[]
+
+  createdAt      DateTime @default(now())
+}
+
+model QuestionOption {
+  id          String   @id @default(cuid())
+  questionId  String
+  key         String   // e.g. "A", "B", "C", "D"
+  text        String
+
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+model Attempt {
+  id          String   @id @default(cuid())
+  userId      String
+  questionId  String
+  answer      String
+  isCorrect   Boolean
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId, questionId])
+}
+
+model Mistake {
+  id          String   @id @default(cuid())
+  userId      String
+  questionId  String
+  userAnswer  String
+  reviewCount Int      @default(0)
+  resolved    Boolean  @default(false)
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, questionId])
+  @@index([userId, resolved])
+}
+
+model Progress {
+  id          String   @id @default(cuid())
+  userId      String
+  lessonId    String
+  mastery     Int      @default(0) // 0 to 100
+  status      String   @default("NOT_STARTED") // NOT_STARTED | LEARNING | NEEDS_REVIEW | MASTERED
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, lessonId])
+  @@index([userId, status])
+}
