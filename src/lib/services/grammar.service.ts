@@ -1,6 +1,6 @@
 import prisma from '@/lib/db/prisma';
 import { DEFAULT_USER_ID } from './roadmap.service';
-import { FALLBACK_LESSONS } from '@/lib/data/fallback-content';
+import { FALLBACK_LESSONS, FALLBACK_SECTIONS } from '@/lib/data/fallback-content';
 
 export interface GrammarLessonSummary {
   id: string;
@@ -12,14 +12,30 @@ export interface GrammarLessonSummary {
   mastery: number;
   status: string;
   unresolvedMistakesCount: number;
+  sectionSlug?: string;
+  sectionName?: string;
+  topicName?: string;
 }
 
-export async function getGrammarLessons(userId: string = DEFAULT_USER_ID): Promise<GrammarLessonSummary[]> {
+export interface SectionDetails {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  order: number;
+  lessons: GrammarLessonSummary[];
+}
+
+export async function getLessonsBySection(
+  sectionSlug: string,
+  userId: string = DEFAULT_USER_ID
+): Promise<GrammarLessonSummary[]> {
   try {
-    const grammarSection = await prisma.section.findUnique({
-      where: { slug: 'grammar' },
+    const section = await prisma.section.findUnique({
+      where: { slug: sectionSlug },
       include: {
         topics: {
+          orderBy: { order: 'asc' },
           include: {
             lessons: {
               orderBy: { order: 'asc' },
@@ -40,8 +56,8 @@ export async function getGrammarLessons(userId: string = DEFAULT_USER_ID): Promi
       },
     });
 
-    if (!grammarSection || grammarSection.topics.length === 0) {
-      return FALLBACK_LESSONS.map((l) => ({
+    if (!section || section.topics.length === 0) {
+      return FALLBACK_LESSONS.filter((l) => l.sectionSlug === sectionSlug).map((l) => ({
         id: l.id,
         title: l.title,
         slug: l.slug,
@@ -51,10 +67,13 @@ export async function getGrammarLessons(userId: string = DEFAULT_USER_ID): Promi
         mastery: l.mastery,
         status: l.status,
         unresolvedMistakesCount: l.unresolvedMistakesCount,
+        sectionSlug: l.sectionSlug,
+        sectionName: l.sectionName,
+        topicName: l.topicName,
       }));
     }
 
-    // Fetch mistakes for this user
+    // Fetch unresolved mistakes for this user
     let userMistakes: any[] = [];
     try {
       userMistakes = await prisma.mistake.findMany({
@@ -78,7 +97,7 @@ export async function getGrammarLessons(userId: string = DEFAULT_USER_ID): Promi
 
     const result: GrammarLessonSummary[] = [];
 
-    for (const topic of grammarSection.topics) {
+    for (const topic of section.topics) {
       for (const lesson of topic.lessons) {
         const prog = lesson.progress[0];
         const mastery = prog ? prog.mastery : 0;
@@ -94,14 +113,17 @@ export async function getGrammarLessons(userId: string = DEFAULT_USER_ID): Promi
           mastery,
           status,
           unresolvedMistakesCount: mistakesByLesson[lesson.id] || 0,
+          sectionSlug: section.slug,
+          sectionName: section.name,
+          topicName: topic.name,
         });
       }
     }
 
     return result.sort((a, b) => a.order - b.order);
   } catch (error) {
-    console.warn('Prisma getGrammarLessons failed, using fallback content:', error);
-    return FALLBACK_LESSONS.map((l) => ({
+    console.warn(`Prisma getLessonsBySection failed for ${sectionSlug}, using fallback content:`, error);
+    return FALLBACK_LESSONS.filter((l) => l.sectionSlug === sectionSlug).map((l) => ({
       id: l.id,
       title: l.title,
       slug: l.slug,
@@ -111,7 +133,64 @@ export async function getGrammarLessons(userId: string = DEFAULT_USER_ID): Promi
       mastery: l.mastery,
       status: l.status,
       unresolvedMistakesCount: l.unresolvedMistakesCount,
+      sectionSlug: l.sectionSlug,
+      sectionName: l.sectionName,
+      topicName: l.topicName,
     }));
+  }
+}
+
+export async function getGrammarLessons(userId: string = DEFAULT_USER_ID): Promise<GrammarLessonSummary[]> {
+  return getLessonsBySection('grammar', userId);
+}
+
+export async function getSectionDetails(
+  sectionSlug: string,
+  userId: string = DEFAULT_USER_ID
+): Promise<SectionDetails | null> {
+  try {
+    const section = await prisma.section.findUnique({
+      where: { slug: sectionSlug },
+    });
+
+    if (!section) {
+      const fallbackSec = FALLBACK_SECTIONS.find((s) => s.slug === sectionSlug);
+      if (!fallbackSec) return null;
+
+      const lessons = await getLessonsBySection(sectionSlug, userId);
+      return {
+        id: fallbackSec.id,
+        name: fallbackSec.name,
+        slug: fallbackSec.slug,
+        description: fallbackSec.description,
+        order: fallbackSec.order,
+        lessons,
+      };
+    }
+
+    const lessons = await getLessonsBySection(sectionSlug, userId);
+    return {
+      id: section.id,
+      name: section.name,
+      slug: section.slug,
+      description: section.description,
+      order: section.order,
+      lessons,
+    };
+  } catch (error) {
+    console.warn(`Prisma getSectionDetails failed for ${sectionSlug}:`, error);
+    const fallbackSec = FALLBACK_SECTIONS.find((s) => s.slug === sectionSlug);
+    if (!fallbackSec) return null;
+
+    const lessons = await getLessonsBySection(sectionSlug, userId);
+    return {
+      id: fallbackSec.id,
+      name: fallbackSec.name,
+      slug: fallbackSec.slug,
+      description: fallbackSec.description,
+      order: fallbackSec.order,
+      lessons,
+    };
   }
 }
 
@@ -160,6 +239,7 @@ export async function getLessonBySlug(slug: string, userId: string = DEFAULT_USE
         explanation: fallback.explanation,
         topicName: fallback.topicName,
         sectionName: fallback.sectionName,
+        sectionSlug: fallback.sectionSlug,
         mastery: fallback.mastery,
         status: fallback.status,
         questions: fallback.questions.map((q) => ({
@@ -186,6 +266,7 @@ export async function getLessonBySlug(slug: string, userId: string = DEFAULT_USE
       explanation: lesson.explanation,
       topicName: lesson.topic.name,
       sectionName: lesson.topic.section.name,
+      sectionSlug: lesson.topic.section.slug,
       mastery: prog ? prog.mastery : 0,
       status: prog ? prog.status : 'NOT_STARTED',
       questions: lesson.questions,
@@ -204,6 +285,7 @@ export async function getLessonBySlug(slug: string, userId: string = DEFAULT_USE
       explanation: fallback.explanation,
       topicName: fallback.topicName,
       sectionName: fallback.sectionName,
+      sectionSlug: fallback.sectionSlug,
       mastery: fallback.mastery,
       status: fallback.status,
       questions: fallback.questions.map((q) => ({

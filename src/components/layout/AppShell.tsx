@@ -19,7 +19,7 @@ export function AppShell({
       <Header title={title} unresolvedMistakesCount={unresolvedMistakesCount} />
       <div className="flex flex-1">
         <Sidebar />
-        <main className="flex-1 pb-20 lg:pb-12 px-4 py-6 sm:px-8 max-w-7xl mx-auto w-full">
+        <main className="flex-1 pb-24 lg:pb-12 px-3 py-4 sm:px-6 sm:py-6 lg:px-8 max-w-7xl mx-auto w-full min-w-0">
           {children}
         </main>
       </div>

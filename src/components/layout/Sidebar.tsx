@@ -23,7 +23,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden lg:flex w-64 flex-col border-r border-slate-200 bg-white min-h-[calc(100vh-4rem)] p-4 justify-between">
+    <aside className="hidden lg:flex w-64 flex-col border-r border-slate-200 bg-white min-h-[calc(100vh-4rem)] p-4 justify-between flex-shrink-0">
       <div className="space-y-6">
         <div>
           <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
@@ -45,7 +45,7 @@ export function Sidebar() {
                   }`}
                 >
                   <Icon className={`text-xl ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
-                  <span>{item.label}</span>
+                  <span className="truncate">{item.label}</span>
                 </Link>
               );
             })}
@@ -65,8 +65,8 @@ export function Sidebar() {
 
       <div className="pt-4 border-t border-slate-100">
         <div className="flex items-center gap-2 text-xs text-slate-400 italic">
-          <MdFormatQuote className="text-base text-slate-300" />
-          <span>Consistency is the key to 110+</span>
+          <MdFormatQuote className="text-base text-slate-300 flex-shrink-0" />
+          <span>Consistency is the key to 600+</span>
         </div>
       </div>
     </aside>

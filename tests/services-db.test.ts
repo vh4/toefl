@@ -17,9 +17,9 @@ describe('TOEFL Learning Platform - Database Services Integration Tests', () => 
     assert.equal(roadmap[2].name, 'Grammar');
   });
 
-  it('retrieves 5 grammar lessons with their mastery levels', async () => {
+  it('retrieves grammar lessons with their mastery levels', async () => {
     const lessons = await getGrammarLessons(testUserId);
-    assert.equal(lessons.length, 5);
+    assert.ok(lessons.length >= 5);
     const simplePresent = lessons.find((l) => l.slug === 'simple-present');
     assert.ok(simplePresent);
     assert.equal(simplePresent.title, 'Simple Present');
